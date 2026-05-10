@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>老熊文件快递柜 - 快传</title>
+    <meta name="description" content="快速分享文件，最大支持25GB，无需注册，永久免费">
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <h1 class="logo">📦 老熊文件快递柜</h1>
+            <p class="tagline">快速分享文件，最大支持25GB，无需注册</p>
+        </header>
+
+        <!-- 主要内容 -->
+        <main class="main">
+            <!-- 上传区域 -->
+            <section class="upload-section card">
+                <h2 class="section-title">📤 上传文件</h2>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <p class="upload-text">拖拽文件到这里或点击选择</p>
+                    <p class="upload-hint">最大 25GB · 无需注册 · 自动过期</p>
+                    <input type="file" id="fileInput" hidden>
+                </div>
+
+                <!-- 文件信息 -->
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div class="file-details">
+                        <span class="file-name" id="fileName"></span>
+                        <span class="file-size" id="fileSize"></span>
+                    </div>
+                    <button class="btn btn-secondary" id="cancelFile">取消</button>
+                </div>
+
+                <!-- 高级设置 -->
+                <div class="advanced-settings">
+                    <button class="settings-toggle" id="settingsToggle">
+                        <span>⚙️ 高级设置</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                    <div class="settings-content" id="settingsContent" style="display: none;">
+                        <div class="setting-item">
+                            <label>过期时间</label>
+                            <select id="expiryDays">
+                                <option value="1">1 天</option>
+                                <option value="3" selected>3 天（默认）</option>
+                                <option value="7">7 天</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>密码保护</label>
+                            <input type="password" id="password" placeholder="留空则不设置密码">
+                        </div>
+                        <div class="setting-item">
+                            <label>阅后即焚</label>
+                            <input type="number" id="maxDownloads" placeholder="下载N次后自动删除" min="1" max="1000">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 上传按钮 -->
+                <button class="btn btn-primary btn-upload" id="uploadBtn" style="display: none;">
+                    开始上传
+                </button>
+
+                <!-- 上传进度 -->
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">上传中... 0%</p>
+                </div>
+
+                <!-- 上传成功 -->
+                <div class="upload-success" id="uploadSuccess" style="display: none;">
+                    <p class="success-icon">✅</p>
+                    <p class="success-text">上传成功！</p>
+                    <div class="share-link">
+                        <input type="text" id="shareLink" readonly>
+                        <button class="btn btn-secondary" id="copyLink">复制链接</button>
+                    </div>
+                    <div class="share-qrcode" id="shareQrcode"></div>
+                    <button class="btn btn-secondary" id="uploadAnother">继续上传</button>
+                </div>
+            </section>
+
+            <!-- 下载区域 -->
+            <section class="download-section card">
+                <h2 class="section-title">📥 下载文件</h2>
+                <div class="download-form">
+                    <input type="text" id="downloadCode" placeholder="输入分享码（如：FQxyz1234）">
+                    <button class="btn btn-primary" id="downloadBtn">下载</button>
+                </div>
+
+                <!-- 文件预览 -->
+                <div class="file-preview" id="filePreview" style="display: none;">
+                    <div class="preview-info">
+                        <p class="preview-name" id="previewName"></p>
+                        <p class="preview-size" id="previewSize"></p>
+                        <p class="preview-expiry" id="previewExpiry"></p>
+                    </div>
+                    <div class="password-input" id="passwordInput" style="display: none;">
+                        <input type="password" id="downloadPassword" placeholder="输入密码">
+                        <button class="btn btn-secondary" id="verifyPassword">验证</button>
+                    </div>
+                    <button class="btn btn-primary" id="startDownload">开始下载</button>
+                </div>
+            </section>
+
+            <!-- 上传历史 -->
+            <section class="history-section card">
+                <h2 class="section-title">📋 我的上传历史</h2>
+                <div class="history-list" id="historyList">
+                    <p class="empty-history">暂无上传记录</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>Powered by <a href="https://storage.to" target="_blank">storage.to</a></p>
+            <p>© 2026 老熊文件快递柜</p>
+        </footer>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- 脚本 -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/upload.js"></script>
+    <script src="js/download.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

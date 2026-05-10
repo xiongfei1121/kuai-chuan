@@ -1,0 +1,530 @@
+/* 全局样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #F9FAFB;
+    color: #111827;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* 头部 */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 40px 0;
+}
+
+.logo {
+    font-size: 32px;
+    font-weight: 700;
+    color: #4F46E5;
+    margin-bottom: 10px;
+}
+
+.tagline {
+    font-size: 16px;
+    color: #6B7280;
+}
+
+/* 卡片 */
+.card {
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #111827;
+}
+
+/* 上传区域 */
+.upload-area {
+    border: 2px dashed #E5E7EB;
+    border-radius: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: #4F46E5;
+    background-color: #F9FAFB;
+}
+
+.upload-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.upload-text {
+    font-size: 16px;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+.upload-hint {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+/* 文件信息 */
+.file-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #F9FAFB;
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.file-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #111827;
+}
+
+.file-size {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+/* 高级设置 */
+.advanced-settings {
+    margin-top: 20px;
+}
+
+.settings-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: none;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #6B7280;
+    transition: all 0.3s ease;
+}
+
+.settings-toggle:hover {
+    background: #F9FAFB;
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+.settings-toggle.active .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.settings-content {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-item label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.setting-item input,
+.setting-item select {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.setting-item input:focus,
+.setting-item select:focus {
+    outline: none;
+    border-color: #4F46E5;
+}
+
+/* 按钮 */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #4F46E5;
+    color: #FFFFFF;
+}
+
+.btn-primary:hover {
+    background: #3730A3;
+}
+
+.btn-secondary {
+    background: #FFFFFF;
+    color: #4F46E5;
+    border: 1px solid #4F46E5;
+}
+
+.btn-secondary:hover {
+    background: #F9FAFB;
+}
+
+.btn-danger {
+    background: #EF4444;
+    color: #FFFFFF;
+}
+
+.btn-danger:hover {
+    background: #DC2626;
+}
+
+.btn-upload {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    font-size: 16px;
+}
+
+/* 上传进度 */
+.upload-progress {
+    margin-top: 20px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #E5E7EB;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #4F46E5;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 14px;
+    color: #6B7280;
+}
+
+/* 上传成功 */
+.upload-success {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.success-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.success-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #10B981;
+    margin-bottom: 20px;
+}
+
+.share-link {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.share-link input {
+    flex: 1;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #F9FAFB;
+}
+
+.share-qrcode {
+    margin: 20px 0;
+}
+
+/* 下载区域 */
+.download-form {
+    display: flex;
+    gap: 12px;
+}
+
+.download-form input {
+    flex: 1;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.download-form input:focus {
+    outline: none;
+    border-color: #4F46E5;
+}
+
+/* 文件预览 */
+.file-preview {
+    margin-top: 20px;
+    padding: 20px;
+    background: #F9FAFB;
+    border-radius: 8px;
+}
+
+.preview-info {
+    margin-bottom: 16px;
+}
+
+.preview-name {
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.preview-size,
+.preview-expiry {
+    font-size: 14px;
+    color: #6B7280;
+    margin-bottom: 4px;
+}
+
+.password-input {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.password-input input {
+    flex: 1;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+/* 历史记录 */
+.history-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.empty-history {
+    text-align: center;
+    color: #6B7280;
+    padding: 40px 0;
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-info {
+    flex: 1;
+}
+
+.history-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.history-meta {
+    font-size: 12px;
+    color: #6B7280;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.history-actions button {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* 页脚 */
+.footer {
+    text-align: center;
+    padding: 40px 0;
+    color: #6B7280;
+    font-size: 14px;
+}
+
+.footer a {
+    color: #4F46E5;
+    text-decoration: none;
+}
+
+.footer a:hover {
+    text-decoration: underline;
+}
+
+/* Toast 提示 */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #111827;
+    color: #FFFFFF;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.toast.success {
+    background: #10B981;
+}
+
+.toast.error {
+    background: #EF4444;
+}
+
+/* 响应式设计 */
+@media (max-width: 600px) {
+    .container {
+        padding: 16px;
+    }
+
+    .header {
+        padding: 20px 0;
+    }
+
+    .logo {
+        font-size: 24px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .upload-area {
+        padding: 40px 16px;
+    }
+
+    .upload-icon {
+        font-size: 36px;
+    }
+
+    .download-form {
+        flex-direction: column;
+    }
+
+    .share-link {
+        flex-direction: column;
+    }
+
+    .history-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .history-actions {
+        width: 100%;
+    }
+
+    .history-actions button {
+        flex: 1;
+    }
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #E5E7EB;
+    border-top-color: #4F46E5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 禁用状态 */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 链接样式 */
+a {
+    color: #4F46E5;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
