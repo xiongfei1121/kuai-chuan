@@ -81,7 +81,6 @@ const Upload = {
      * 检查 URL 参数
      */
     checkUrlParams() {
-        // 可以从 URL 参数读取文件 ID 进行下载
         const fileId = Utils.getUrlParam('id');
         if (fileId) {
             document.getElementById('downloadCode').value = fileId;
@@ -91,12 +90,10 @@ const Upload = {
 
     /**
      * 处理文件选择
-     * @param {File} file - 文件对象
      */
     handleFileSelect(file) {
         if (!file) return;
 
-        // 检查文件大小
         if (!Utils.isFileSizeValid(file.size)) {
             Utils.showToast('文件大小超过 25GB 限制', 'error');
             return;
@@ -104,7 +101,6 @@ const Upload = {
 
         this.currentFile = file;
 
-        // 显示文件信息
         document.getElementById('fileName').textContent = file.name;
         document.getElementById('fileSize').textContent = Utils.formatSize(file.size);
         document.getElementById('fileInfo').style.display = 'flex';
@@ -114,38 +110,30 @@ const Upload = {
 
     /**
      * 更新进度显示
-     * @param {number} loaded - 已上传字节数
-     * @param {number} total - 总字节数
      */
     updateProgress(loaded, total) {
         const now = Date.now();
         const percent = Math.round((loaded / total) * 100);
 
-        // 更新进度条
         document.getElementById('progressFill').style.width = percent + '%';
         document.getElementById('progressPercent').textContent = percent + '%';
         document.getElementById('progressUploaded').textContent = 
-            `${Utils.formatSize(loaded)} / ${Utils.formatSize(total)}`;
+            Utils.formatSize(loaded) + ' / ' + Utils.formatSize(total);
 
-        // 计算上传速度（使用最近3秒的平均速度）
         if (this.lastUpdateTime && this.lastUploadedBytes) {
-            const timeDiff = (now - this.lastUpdateTime) / 1000; // 秒
+            const timeDiff = (now - this.lastUpdateTime) / 1000;
             const bytesDiff = loaded - this.lastUploadedBytes;
             const currentSpeed = bytesDiff / timeDiff;
 
-            // 保存速度历史（最近10个采样点）
             this.speedHistory.push({ time: now, speed: currentSpeed });
             if (this.speedHistory.length > 10) {
                 this.speedHistory.shift();
             }
 
-            // 计算平均速度
             const avgSpeed = this.speedHistory.reduce((sum, item) => sum + item.speed, 0) / this.speedHistory.length;
             
-            // 显示速度
             document.getElementById('progressSpeed').textContent = Utils.formatSize(avgSpeed) + '/s';
 
-            // 计算剩余时间
             if (avgSpeed > 0) {
                 const remainingBytes = total - loaded;
                 const remainingSeconds = remainingBytes / avgSpeed;
@@ -159,8 +147,6 @@ const Upload = {
 
     /**
      * 格式化时间
-     * @param {number} seconds - 秒数
-     * @returns {string} 格式化的时间
      */
     formatTime(seconds) {
         if (seconds < 60) {
@@ -168,11 +154,11 @@ const Upload = {
         } else if (seconds < 3600) {
             const minutes = Math.floor(seconds / 60);
             const secs = Math.round(seconds % 60);
-            return `${minutes} 分 ${secs} 秒`;
+            return minutes + ' 分 ' + secs + ' 秒';
         } else {
             const hours = Math.floor(seconds / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
-            return `${hours} 小时 ${minutes} 分`;
+            return hours + ' 小时 ' + minutes + ' 分';
         }
     },
 
@@ -185,19 +171,16 @@ const Upload = {
         this.isUploading = true;
         const file = this.currentFile;
 
-        // 重置进度跟踪
         this.uploadStartTime = Date.now();
         this.lastUploadedBytes = 0;
         this.lastUpdateTime = null;
         this.speedHistory = [];
 
-        // 显示进度
         document.getElementById('uploadBtn').style.display = 'none';
         document.getElementById('uploadProgress').style.display = 'block';
         document.getElementById('progressStatus').textContent = '正在初始化上传...';
 
         try {
-            // 1. 初始化上传
             const initRes = await API.initUpload(
                 file.name,
                 Utils.getMimeType(file),
@@ -208,13 +191,11 @@ const Upload = {
                 throw new Error(initRes.error || '初始化失败');
             }
 
-            // 2. 上传文件到 R2
             document.getElementById('progressStatus').textContent = '正在上传文件...';
             await API.uploadToR2(initRes.upload_url, file, (percent, loaded, total) => {
                 this.updateProgress(loaded || (percent / 100 * file.size), total || file.size);
             });
 
-            // 3. 确认上传
             document.getElementById('progressStatus').textContent = '正在确认上传...';
             document.getElementById('progressSpeed').textContent = '--';
             document.getElementById('progressTime').textContent = '--';
@@ -230,18 +211,89 @@ const Upload = {
                 throw new Error(confirmRes.error || '确认失败');
             }
 
-            // 4. 应用高级设置
             const fileId = confirmRes.file.id;
             const ownerToken = confirmRes.owner_token;
             const password = document.getElementById('password').value;
             const expiryDays = parseInt(document.getElementById('expiryDays').value);
             const maxDownloads = document.getElementById('maxDownloads').value;
 
-            // 设置密码
             if (password) {
                 document.getElementById('progressStatus').textContent = '正在设置密码...';
                 await API.setFilePassword(fileId, password, ownerToken);
             }
 
-            // 设置过期时间（如果不是默认的 3 天）
-            if (
+            if (expiryDays !== 3) {
+                document.getElementById('progressStatus').textContent = '正在设置过期时间...';
+                await API.setFileExpiry(fileId, expiryDays, ownerToken);
+            }
+
+            if (maxDownloads) {
+                document.getElementById('progressStatus').textContent = '正在设置下载限制...';
+                await API.setFileMaxDownloads(fileId, parseInt(maxDownloads), ownerToken);
+            }
+
+            this.showSuccess(confirmRes.file, ownerToken);
+
+            History.addUpload({
+                id: fileId,
+                filename: file.name,
+                size: file.size,
+                uploaded_at: new Date().toISOString(),
+                owner_token: ownerToken,
+                url: confirmRes.file.url
+            });
+
+            Utils.showToast('上传成功！', 'success');
+
+        } catch (error) {
+            console.error('上传失败:', error);
+            Utils.showToast('上传失败: ' + error.message, 'error');
+            document.getElementById('uploadBtn').style.display = 'block';
+            document.getElementById('uploadProgress').style.display = 'none';
+        } finally {
+            this.isUploading = false;
+        }
+    },
+
+    /**
+     * 显示上传成功
+     */
+    showSuccess(file, ownerToken) {
+        document.getElementById('uploadProgress').style.display = 'none';
+        document.getElementById('fileInfo').style.display = 'none';
+        document.getElementById('uploadSuccess').style.display = 'block';
+
+        const shareLink = document.getElementById('shareLink');
+        shareLink.value = file.url;
+
+        Utils.generateQRCode(file.url, document.getElementById('shareQrcode'));
+    },
+
+    /**
+     * 重置上传
+     */
+    resetUpload() {
+        this.currentFile = null;
+        this.isUploading = false;
+        this.uploadStartTime = null;
+        this.lastUploadedBytes = 0;
+        this.lastUpdateTime = null;
+        this.speedHistory = [];
+
+        document.getElementById('fileInput').value = '';
+        document.getElementById('uploadArea').style.display = 'block';
+        document.getElementById('fileInfo').style.display = 'none';
+        document.getElementById('uploadBtn').style.display = 'none';
+        document.getElementById('uploadProgress').style.display = 'none';
+        document.getElementById('uploadSuccess').style.display = 'none';
+        document.getElementById('progressFill').style.width = '0%';
+        document.getElementById('progressPercent').textContent = '0%';
+        document.getElementById('progressUploaded').textContent = '0 B / 0 B';
+        document.getElementById('progressSpeed').textContent = '计算中...';
+        document.getElementById('progressTime').textContent = '计算中...';
+
+        document.getElementById('password').value = '';
+        document.getElementById('expiryDays').value = '3';
+        document.getElementById('maxDownloads').value = '';
+    }
+};
