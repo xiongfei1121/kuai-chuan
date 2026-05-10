@@ -73,7 +73,25 @@
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
-                    <p class="progress-text" id="progressText">上传中... 0%</p>
+                    <div class="progress-details">
+                        <div class="progress-row">
+                            <span class="progress-label">进度</span>
+                            <span class="progress-value" id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-row">
+                            <span class="progress-label">已上传</span>
+                            <span class="progress-value" id="progressUploaded">0 B / 0 B</span>
+                        </div>
+                        <div class="progress-row">
+                            <span class="progress-label">上传速度</span>
+                            <span class="progress-value" id="progressSpeed">计算中...</span>
+                        </div>
+                        <div class="progress-row">
+                            <span class="progress-label">剩余时间</span>
+                            <span class="progress-value" id="progressTime">计算中...</span>
+                        </div>
+                    </div>
+                    <p class="progress-status" id="progressStatus">正在上传...</p>
                 </div>
 
                 <!-- 上传成功 -->

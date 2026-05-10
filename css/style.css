@@ -255,6 +255,43 @@ body {
     color: #6B7280;
 }
 
+.progress-details {
+    margin-top: 16px;
+    padding: 16px;
+    background: #F9FAFB;
+    border-radius: 8px;
+}
+
+.progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.progress-row:last-child {
+    border-bottom: none;
+}
+
+.progress-label {
+    font-size: 14px;
+    color: #6B7280;
+}
+
+.progress-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #111827;
+}
+
+.progress-status {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 14px;
+    color: #6B7280;
+}
+
 /* 上传成功 */
 .upload-success {
     text-align: center;

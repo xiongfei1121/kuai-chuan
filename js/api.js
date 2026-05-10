@@ -67,7 +67,7 @@ const API = {
      * 上传文件到 R2
      * @param {string} url - 预签名 URL
      * @param {File} file - 文件对象
-     * @param {Function} onProgress - 进度回调
+     * @param {Function} onProgress - 进度回调 (percent, loaded, total)
      * @returns {Promise<Object>} 上传结果
      */
     uploadToR2(url, file, onProgress) {
@@ -77,7 +77,7 @@ const API = {
             xhr.upload.onprogress = (e) => {
                 if (onProgress && e.lengthComputable) {
                     const percent = Math.round((e.loaded / e.total) * 100);
-                    onProgress(percent);
+                    onProgress(percent, e.loaded, e.total);
                 }
             };
 
