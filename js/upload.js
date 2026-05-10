@@ -247,7 +247,11 @@ const Upload = {
 
         } catch (error) {
             console.error('上传失败:', error);
-            Utils.showToast('上传失败: ' + error.message, 'error');
+            let errorMsg = error.message;
+            if (errorMsg.includes("Too many uploads")) {
+                errorMsg = "上传请求过多，请等待 30 秒后重试";
+            }
+            Utils.showToast("上传失败: " + errorMsg, 'error');
             document.getElementById('uploadBtn').style.display = 'block';
             document.getElementById('uploadProgress').style.display = 'none';
         } finally {
