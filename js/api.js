@@ -7,7 +7,6 @@ const API = {
 
     /**
      * 获取访客令牌
-     * @returns {string} 访客令牌
      */
     getVisitorToken() {
         let token = localStorage.getItem('visitor_token');
@@ -20,9 +19,6 @@ const API = {
 
     /**
      * 发送请求
-     * @param {string} url - URL
-     * @param {Object} options - 请求选项
-     * @returns {Promise<Object>} 响应数据
      */
     async request(url, options = {}) {
         const headers = {
@@ -47,10 +43,6 @@ const API = {
 
     /**
      * 初始化上传
-     * @param {string} filename - 文件名
-     * @param {string} contentType - MIME 类型
-     * @param {number} size - 文件大小
-     * @returns {Promise<Object>} 上传初始化数据
      */
     async initUpload(filename, contentType, size) {
         return this.request(`${this.baseUrl}/upload/init`, {
@@ -64,11 +56,38 @@ const API = {
     },
 
     /**
-     * 上传文件到 R2
-     * @param {string} url - 预签名 URL
-     * @param {File} file - 文件对象
-     * @param {Function} onProgress - 进度回调 (percent, loaded, total)
-     * @returns {Promise<Object>} 上传结果
+     * 上传单个分片到 R2
+     */
+    uploadPartToR2(url, partBlob, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.onprogress = (e) => {
+                if (onProgress && e.lengthComputable) {
+                    onProgress(e.loaded, e.total);
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const etag = xhr.getResponseHeader('ETag');
+                    resolve({ success: true, etag: etag ? etag.replace(/"/g, '') : null });
+                } else {
+                    reject(new Error(`分片上传失败: ${xhr.status}`));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('网络错误'));
+            xhr.ontimeout = () => reject(new Error('分片上传超时'));
+
+            xhr.open('PUT', url, true);
+            xhr.timeout = 10 * 60 * 1000; // 10分钟超时（单个分片）
+            xhr.send(partBlob);
+        });
+    },
+
+    /**
+     * 上传文件到 R2（单次上传，用于小文件）
      */
     uploadToR2(url, file, onProgress) {
         return new Promise((resolve, reject) => {
@@ -102,12 +121,45 @@ const API = {
     },
 
     /**
+     * 获取分片上传 URL
+     */
+    async getUploadParts(r2Key, partCount) {
+        return this.request(`${this.baseUrl}/upload/parts`, {
+            method: 'POST',
+            body: JSON.stringify({
+                r2_key: r2Key,
+                part_count: partCount
+            })
+        });
+    },
+
+    /**
+     * 完成分片上传
+     */
+    async completeMultipartUpload(r2Key, parts) {
+        return this.request(`${this.baseUrl}/upload/complete-multipart`, {
+            method: 'POST',
+            body: JSON.stringify({
+                r2_key: r2Key,
+                parts: parts
+            })
+        });
+    },
+
+    /**
+     * 中止上传
+     */
+    async abortUpload(r2Key) {
+        return this.request(`${this.baseUrl}/upload/abort`, {
+            method: 'POST',
+            body: JSON.stringify({
+                r2_key: r2Key
+            })
+        });
+    },
+
+    /**
      * 确认上传
-     * @param {string} filename - 文件名
-     * @param {number} size - 文件大小
-     * @param {string} contentType - MIME 类型
-     * @param {string} r2Key - R2 键
-     * @returns {Promise<Object>} 确认结果
      */
     async confirmUpload(filename, size, contentType, r2Key) {
         return this.request(`${this.baseUrl}/upload/confirm`, {
@@ -123,8 +175,6 @@ const API = {
 
     /**
      * 获取文件状态
-     * @param {string} fileId - 文件 ID
-     * @returns {Promise<Object>} 文件状态
      */
     async getFileStatus(fileId) {
         return this.request(`${this.baseUrl}/file/${fileId}/status`);
@@ -132,10 +182,6 @@ const API = {
 
     /**
      * 设置文件密码
-     * @param {string} fileId - 文件 ID
-     * @param {string} password - 密码
-     * @param {string} ownerToken - 所有者令牌
-     * @returns {Promise<Object>} 设置结果
      */
     async setFilePassword(fileId, password, ownerToken) {
         return this.request(`${this.baseUrl}/file/${fileId}/password`, {
@@ -149,10 +195,6 @@ const API = {
 
     /**
      * 设置文件过期时间
-     * @param {string} fileId - 文件 ID
-     * @param {number} days - 天数
-     * @param {string} ownerToken - 所有者令牌
-     * @returns {Promise<Object>} 设置结果
      */
     async setFileExpiry(fileId, days, ownerToken) {
         return this.request(`${this.baseUrl}/file/${fileId}/expiry`, {
@@ -166,10 +208,6 @@ const API = {
 
     /**
      * 设置文件最大下载次数
-     * @param {string} fileId - 文件 ID
-     * @param {number} maxDownloads - 最大下载次数
-     * @param {string} ownerToken - 所有者令牌
-     * @returns {Promise<Object>} 设置结果
      */
     async setFileMaxDownloads(fileId, maxDownloads, ownerToken) {
         return this.request(`${this.baseUrl}/file/${fileId}/max-downloads`, {
@@ -183,9 +221,6 @@ const API = {
 
     /**
      * 删除文件
-     * @param {string} fileId - 文件 ID
-     * @param {string} ownerToken - 所有者令牌
-     * @returns {Promise<Object>} 删除结果
      */
     async deleteFile(fileId, ownerToken) {
         return this.request(`${this.baseUrl}/file/${fileId}`, {
@@ -198,9 +233,6 @@ const API = {
 
     /**
      * 验证文件密码
-     * @param {string} fileId - 文件 ID
-     * @param {string} password - 密码
-     * @returns {Promise<Object>} 验证结果
      */
     async verifyFilePassword(fileId, password) {
         return this.request(`${this.baseUrl}/file/${fileId}/verify-password`, {
@@ -211,7 +243,6 @@ const API = {
 
     /**
      * 获取带宽状态
-     * @returns {Promise<Object>} 带宽状态
      */
     async getBandwidthStatus() {
         return this.request(`${this.baseUrl}/bandwidth/status`);
@@ -219,7 +250,6 @@ const API = {
 
     /**
      * 健康检查
-     * @returns {Promise<Object>} 健康状态
      */
     async healthCheck() {
         return this.request(`${this.baseUrl}/health`);
