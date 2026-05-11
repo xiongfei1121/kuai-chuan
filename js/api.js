@@ -27,18 +27,26 @@ const API = {
             ...options.headers
         };
 
-        const response = await fetch(url, {
-            ...options,
-            headers
-        });
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers
+            });
 
-        const data = await response.json();
+            const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
+            if (!response.ok) {
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+
+            return data;
+        } catch (error) {
+            // 如果是网络错误，提供更友好的提示
+            if (error.message === 'Failed to fetch') {
+                throw new Error('网络连接失败，请检查网络后重试');
+            }
+            throw error;
         }
-
-        return data;
     },
 
     /**
@@ -56,9 +64,9 @@ const API = {
     },
 
     /**
-     * 上传单个分片到 R2
+     * 上传文件到 R2（单次上传或分片上传）
      */
-    uploadPartToR2(url, partBlob, onProgress) {
+    uploadToR2(url, blob, onProgress) {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
@@ -69,67 +77,29 @@ const API = {
             };
 
             xhr.onload = () => {
-                console.log(`分片上传完成，状态码: ${xhr.status}`);
                 if (xhr.status >= 200 && xhr.status < 300) {
                     const etag = xhr.getResponseHeader('ETag');
-                    console.log(`ETag: ${etag}`);
-                    resolve({ success: true, etag: etag ? etag.replace(/"/g, '') : null });
+                    resolve({ 
+                        success: true, 
+                        etag: etag ? etag.replace(/"/g, '') : null 
+                    });
                 } else {
-                    const error = `分片上传失败: ${xhr.status} ${xhr.statusText}`;
-                    console.error(error);
-                    reject(new Error(error));
+                    reject(new Error(`上传失败: ${xhr.status} ${xhr.statusText}`));
                 }
             };
 
-            xhr.onerror = (e) => {
-                console.error('分片上传网络错误:', e);
+            xhr.onerror = () => {
+                console.error('XHR 网络错误:', xhr.status, xhr.statusText);
                 reject(new Error('网络错误，请检查网络连接'));
             };
             
             xhr.ontimeout = () => {
-                console.error('分片上传超时');
-                reject(new Error('分片上传超时，请重试'));
+                reject(new Error('上传超时，请重试'));
             };
-
-            xhr.open('PUT', url, true);
-            xhr.timeout = 10 * 60 * 1000; // 10分钟超时（单个分片）
-            
-            console.log(`开始上传分片，大小: ${(partBlob.size / 1024 / 1024).toFixed(2)} MB`);
-            xhr.send(partBlob);
-        });
-    },
-
-    /**
-     * 上传文件到 R2（单次上传，用于小文件）
-     */
-    uploadToR2(url, file, onProgress) {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-
-            xhr.upload.onprogress = (e) => {
-                if (onProgress && e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    onProgress(percent, e.loaded, e.total);
-                }
-            };
-
-            xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve({
-                        success: true,
-                        etag: xhr.getResponseHeader('ETag')
-                    });
-                } else {
-                    reject(new Error(`上传失败: ${xhr.status}`));
-                }
-            };
-
-            xhr.onerror = () => reject(new Error('网络错误'));
-            xhr.ontimeout = () => reject(new Error('上传超时'));
 
             xhr.open('PUT', url, true);
             xhr.timeout = 30 * 60 * 1000; // 30分钟超时
-            xhr.send(file);
+            xhr.send(blob);
         });
     },
 
