@@ -11,10 +11,6 @@ const Upload = {
     speedHistory: [],
     uploadedBytes: 0,
 
-    // 分片上传配置
-    CHUNK_SIZE: 10 * 1024 * 1024, // 10MB 每个分片
-    MAX_RETRIES: 3,
-
     /**
      * 初始化上传模块
      */
@@ -165,7 +161,8 @@ const Upload = {
         document.getElementById('progressStatus').textContent = '正在初始化上传...';
 
         try {
-            // 初始化上传
+            // 1. 初始化上传
+            console.log('初始化上传:', file.name, file.size);
             const initRes = await API.initUpload(
                 file.name,
                 Utils.getMimeType(file),
@@ -176,22 +173,28 @@ const Upload = {
                 throw new Error(initRes.error || '初始化失败');
             }
 
-            const r2Key = initRes.r2_key;
+            console.log('初始化响应:', initRes);
 
-            // 根据返回的 type 判断上传方式
+            const r2Key = initRes.r2_key;
+            let uploadId = null;
+            let parts = [];
+
+            // 2. 根据返回的 type 判断上传方式
             if (initRes.type === 'multipart') {
                 // 分片上传
-                await this.uploadMultipart(file, initRes);
+                uploadId = initRes.upload_id;
+                parts = await this.uploadMultipart(file, initRes);
             } else {
                 // 单次上传
-                await this.uploadSingle(file, r2Key, initRes.upload_url);
+                await this.uploadSingle(file, initRes.upload_url);
             }
 
-            // 确认上传
+            // 3. 确认上传
             document.getElementById('progressStatus').textContent = '正在确认上传...';
             document.getElementById('progressSpeed').textContent = '--';
             document.getElementById('progressTime').textContent = '--';
             
+            console.log('确认上传...');
             const confirmRes = await API.confirmUpload(
                 file.name,
                 file.size,
@@ -203,7 +206,9 @@ const Upload = {
                 throw new Error(confirmRes.error || '确认失败');
             }
 
-            // 应用高级设置
+            console.log('上传成功:', confirmRes);
+
+            // 4. 应用高级设置
             const fileId = confirmRes.file.id;
             const ownerToken = confirmRes.owner_token;
             const password = document.getElementById('password').value;
@@ -241,10 +246,15 @@ const Upload = {
         } catch (error) {
             console.error('上传失败:', error);
             let errorMsg = error.message;
-            if (errorMsg.includes("Too many uploads")) {
-                errorMsg = "上传请求过多，请等待 30 秒后重试";
+            
+            // 友好的错误提示
+            if (errorMsg.includes('Too many uploads')) {
+                errorMsg = '上传请求过多，请等待 1 分钟后重试';
+            } else if (errorMsg.includes('Failed to fetch') || errorMsg.includes('网络')) {
+                errorMsg = '网络连接失败，请检查网络后重试';
             }
-            Utils.showToast("上传失败: " + errorMsg, 'error');
+            
+            Utils.showToast('上传失败: ' + errorMsg, 'error');
             document.getElementById('uploadBtn').style.display = 'block';
             document.getElementById('uploadProgress').style.display = 'none';
         } finally {
@@ -255,11 +265,11 @@ const Upload = {
     /**
      * 单次上传（小文件）
      */
-    async uploadSingle(file, r2Key, uploadUrl) {
+    async uploadSingle(file, uploadUrl) {
         document.getElementById('progressStatus').textContent = '正在上传文件...';
         
-        await API.uploadToR2(uploadUrl, file, (percent, loaded, total) => {
-            this.updateProgress(loaded || (percent / 100 * file.size), total || file.size);
+        await API.uploadToR2(uploadUrl, file, (loaded, total) => {
+            this.updateProgress(loaded, total);
         });
     },
 
@@ -268,7 +278,6 @@ const Upload = {
      */
     async uploadMultipart(file, initRes) {
         const uploadId = initRes.upload_id;
-        const r2Key = initRes.r2_key;
         const totalParts = initRes.total_parts;
         const initialUrls = initRes.initial_urls;
         const parts = [];
@@ -291,11 +300,17 @@ const Upload = {
             chunkProgress.style.display = 'block';
             chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
 
-            const partResult = await this.uploadPartWithRetry(partUrl, partBlob, partNum);
-            parts.push({ partNumber: partNum, etag: partResult.etag });
-
+            console.log(`上传分片 ${partNum}/${totalParts}, 大小: ${Utils.formatSize(partBlob.size)}`);
+            
+            const result = await API.uploadToR2(partUrl, partBlob, (loaded, total) => {
+                const currentPartProgress = loaded;
+                const totalUploaded = this.uploadedBytes + currentPartProgress;
+                this.updateProgress(totalUploaded, file.size);
+            });
+            
+            parts.push({ partNumber: partNum, etag: result.etag });
             this.uploadedBytes = end;
-            this.updateProgress(this.uploadedBytes, file.size);
+            console.log(`分片 ${partNum} 上传完成`);
         }
 
         // 如果需要更多分片 URL
@@ -308,6 +323,7 @@ const Upload = {
             }
 
             if (remainingPartNumbers.length > 0) {
+                console.log('获取剩余分片 URL:', remainingPartNumbers);
                 const partsRes = await API.getUploadParts(uploadId, remainingPartNumbers);
                 
                 if (!partsRes.success) {
@@ -327,11 +343,17 @@ const Upload = {
                     const chunkProgress = document.getElementById('progressChunk');
                     chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
 
-                    const partResult = await this.uploadPartWithRetry(partUrlObj.url, partBlob, partNum);
-                    parts.push({ partNumber: partNum, etag: partResult.etag });
-
+                    console.log(`上传分片 ${partNum}/${totalParts}`);
+                    
+                    const result = await API.uploadToR2(partUrlObj.url, partBlob, (loaded, total) => {
+                        const currentPartProgress = loaded;
+                        const totalUploaded = this.uploadedBytes + currentPartProgress;
+                        this.updateProgress(totalUploaded, file.size);
+                    });
+                    
+                    parts.push({ partNumber: partNum, etag: result.etag });
                     this.uploadedBytes = end;
-                    this.updateProgress(this.uploadedBytes, file.size);
+                    console.log(`分片 ${partNum} 上传完成`);
                 }
             }
         }
@@ -340,44 +362,15 @@ const Upload = {
         document.getElementById('progressStatus').textContent = '正在合并分片...';
         document.getElementById('progressChunk').style.display = 'none';
         
+        console.log('完成分片上传，合并分片...');
         const completeRes = await API.completeMultipartUpload(uploadId, parts);
 
         if (!completeRes.success) {
             throw new Error(completeRes.error || '合并分片失败');
         }
-    },
-
-    /**
-     * 带重试的分片上传
-     */
-    async uploadPartWithRetry(url, blob, partIndex, retryCount = 0) {
-        console.log(`上传分片 ${partIndex}，重试次数: ${retryCount}`);
         
-        try {
-            const result = await API.uploadPartToR2(url, blob, (loaded, total) => {
-                const currentPartProgress = loaded;
-                const totalUploaded = this.uploadedBytes - blob.size + currentPartProgress;
-                this.updateProgress(totalUploaded, this.currentFile.size);
-            });
-            
-            console.log(`分片 ${partIndex} 上传成功，ETag: ${result.etag}`);
-            return result;
-        } catch (error) {
-            console.error(`分片 ${partIndex} 上传失败:`, error);
-            
-            if (retryCount < this.MAX_RETRIES) {
-                console.warn(`分片 ${partIndex} 上传失败，重试 ${retryCount + 1}/${this.MAX_RETRIES}`);
-                Utils.showToast(`分片 ${partIndex} 上传失败，正在重试...`, 'error');
-                await this.sleep(2000);
-                return this.uploadPartWithRetry(url, blob, partIndex, retryCount + 1);
-            } else {
-                throw new Error(`分片 ${partIndex} 上传失败: ${error.message}`);
-            }
-        }
-    },
-
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        console.log('分片合并完成');
+        return parts;
     },
 
     showSuccess(file, ownerToken) {
