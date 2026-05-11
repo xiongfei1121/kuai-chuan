@@ -279,81 +279,135 @@ const Upload = {
     async uploadMultipart(file, initRes) {
         const uploadId = initRes.upload_id;
         const totalParts = initRes.total_parts;
-        const initialUrls = initRes.initial_urls;
+        const initialUrls = initRes.initial_urls || {};
         const parts = [];
+
+        console.log('分片上传初始化:', {
+            uploadId,
+            totalParts,
+            initialUrls,
+            partSize: initRes.part_size
+        });
 
         document.getElementById('progressStatus').textContent = `正在上传文件 (0/${totalParts} 分片)...`;
 
         // 上传初始分片
         const initialPartNumbers = Object.keys(initialUrls).map(n => parseInt(n)).sort((a, b) => a - b);
         
-        for (const partNum of initialPartNumbers) {
-            const start = (partNum - 1) * initRes.part_size;
-            const end = Math.min(start + initRes.part_size, file.size);
-            const partBlob = file.slice(start, end);
-            const partUrl = initialUrls[partNum];
-
-            document.getElementById('progressStatus').textContent = 
-                `正在上传文件 (${partNum}/${totalParts} 分片)...`;
-            
-            const chunkProgress = document.getElementById('progressChunk');
-            chunkProgress.style.display = 'block';
-            chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
-
-            console.log(`上传分片 ${partNum}/${totalParts}, 大小: ${Utils.formatSize(partBlob.size)}`);
-            
-            const result = await API.uploadToR2(partUrl, partBlob, (loaded, total) => {
-                const currentPartProgress = loaded;
-                const totalUploaded = this.uploadedBytes + currentPartProgress;
-                this.updateProgress(totalUploaded, file.size);
-            });
-            
-            parts.push({ partNumber: partNum, etag: result.etag });
-            this.uploadedBytes = end;
-            console.log(`分片 ${partNum} 上传完成`);
-        }
-
-        // 如果需要更多分片 URL
-        if (initialPartNumbers.length < totalParts) {
-            const remainingPartNumbers = [];
+        console.log('初始分片编号:', initialPartNumbers);
+        
+        // 如果没有初始 URL，获取所有分片 URL
+        if (initialPartNumbers.length === 0) {
+            console.log('没有初始 URL，获取所有分片 URL');
+            const allPartNumbers = [];
             for (let i = 1; i <= totalParts; i++) {
-                if (!initialUrls[i]) {
-                    remainingPartNumbers.push(i);
-                }
+                allPartNumbers.push(i);
+            }
+            
+            const partsRes = await API.getUploadParts(uploadId, allPartNumbers);
+            if (!partsRes.success) {
+                throw new Error(partsRes.error || '获取分片URL失败');
+            }
+            
+            console.log('获取到的分片 URL:', partsRes.part_urls);
+            
+            // 上传所有分片
+            for (const partUrlObj of partsRes.part_urls) {
+                const partNum = partUrlObj.partNumber;
+                const start = (partNum - 1) * initRes.part_size;
+                const end = Math.min(start + initRes.part_size, file.size);
+                const partBlob = file.slice(start, end);
+
+                document.getElementById('progressStatus').textContent = 
+                    `正在上传文件 (${partNum}/${totalParts} 分片)...`;
+                
+                const chunkProgress = document.getElementById('progressChunk');
+                chunkProgress.style.display = 'block';
+                chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
+
+                console.log(`上传分片 ${partNum}/${totalParts}`);
+                
+                const result = await API.uploadToR2(partUrlObj.url, partBlob, (loaded, total) => {
+                    const currentPartProgress = loaded;
+                    const totalUploaded = this.uploadedBytes + currentPartProgress;
+                    this.updateProgress(totalUploaded, file.size);
+                });
+                
+                parts.push({ partNumber: partNum, etag: result.etag });
+                this.uploadedBytes = end;
+                console.log(`分片 ${partNum} 上传完成`);
+            }
+        } else {
+            // 有初始 URL，按原流程处理
+        
+            for (const partNum of initialPartNumbers) {
+                const start = (partNum - 1) * initRes.part_size;
+                const end = Math.min(start + initRes.part_size, file.size);
+                const partBlob = file.slice(start, end);
+                const partUrl = initialUrls[partNum];
+
+                document.getElementById('progressStatus').textContent = 
+                    `正在上传文件 (${partNum}/${totalParts} 分片)...`;
+                
+                const chunkProgress = document.getElementById('progressChunk');
+                chunkProgress.style.display = 'block';
+                chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
+
+                console.log(`上传分片 ${partNum}/${totalParts}, 大小: ${Utils.formatSize(partBlob.size)}`);
+                
+                const result = await API.uploadToR2(partUrl, partBlob, (loaded, total) => {
+                    const currentPartProgress = loaded;
+                    const totalUploaded = this.uploadedBytes + currentPartProgress;
+                    this.updateProgress(totalUploaded, file.size);
+                });
+                
+                parts.push({ partNumber: partNum, etag: result.etag });
+                this.uploadedBytes = end;
+                console.log(`分片 ${partNum} 上传完成`);
             }
 
-            if (remainingPartNumbers.length > 0) {
-                console.log('获取剩余分片 URL:', remainingPartNumbers);
-                const partsRes = await API.getUploadParts(uploadId, remainingPartNumbers);
-                
-                if (!partsRes.success) {
-                    throw new Error(partsRes.error || '获取分片URL失败');
+            // 如果需要更多分片 URL
+            if (initialPartNumbers.length < totalParts) {
+                const remainingPartNumbers = [];
+                for (let i = 1; i <= totalParts; i++) {
+                    if (!initialUrls[i]) {
+                        remainingPartNumbers.push(i);
+                    }
                 }
 
-                // 上传剩余分片
-                for (const partUrlObj of partsRes.part_urls) {
-                    const partNum = partUrlObj.partNumber;
-                    const start = (partNum - 1) * initRes.part_size;
-                    const end = Math.min(start + initRes.part_size, file.size);
-                    const partBlob = file.slice(start, end);
+                if (remainingPartNumbers.length > 0) {
+                    console.log('获取剩余分片 URL:', remainingPartNumbers);
+                    const partsRes = await API.getUploadParts(uploadId, remainingPartNumbers);
+                    
+                    if (!partsRes.success) {
+                        throw new Error(partsRes.error || '获取分片URL失败');
+                    }
 
-                    document.getElementById('progressStatus').textContent = 
-                        `正在上传文件 (${partNum}/${totalParts} 分片)...`;
-                    
-                    const chunkProgress = document.getElementById('progressChunk');
-                    chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
+                    // 上传剩余分片
+                    for (const partUrlObj of partsRes.part_urls) {
+                        const partNum = partUrlObj.partNumber;
+                        const start = (partNum - 1) * initRes.part_size;
+                        const end = Math.min(start + initRes.part_size, file.size);
+                        const partBlob = file.slice(start, end);
 
-                    console.log(`上传分片 ${partNum}/${totalParts}`);
-                    
-                    const result = await API.uploadToR2(partUrlObj.url, partBlob, (loaded, total) => {
-                        const currentPartProgress = loaded;
-                        const totalUploaded = this.uploadedBytes + currentPartProgress;
-                        this.updateProgress(totalUploaded, file.size);
-                    });
-                    
-                    parts.push({ partNumber: partNum, etag: result.etag });
-                    this.uploadedBytes = end;
-                    console.log(`分片 ${partNum} 上传完成`);
+                        document.getElementById('progressStatus').textContent = 
+                            `正在上传文件 (${partNum}/${totalParts} 分片)...`;
+                        
+                        const chunkProgress = document.getElementById('progressChunk');
+                        chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
+
+                        console.log(`上传分片 ${partNum}/${totalParts}`);
+                        
+                        const result = await API.uploadToR2(partUrlObj.url, partBlob, (loaded, total) => {
+                            const currentPartProgress = loaded;
+                            const totalUploaded = this.uploadedBytes + currentPartProgress;
+                            this.updateProgress(totalUploaded, file.size);
+                        });
+                        
+                        parts.push({ partNumber: partNum, etag: result.etag });
+                        this.uploadedBytes = end;
+                        console.log(`分片 ${partNum} 上传完成`);
+                    }
                 }
             }
         }
