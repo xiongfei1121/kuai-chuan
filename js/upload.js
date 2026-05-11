@@ -9,11 +9,11 @@ const Upload = {
     lastUploadedBytes: 0,
     lastUpdateTime: null,
     speedHistory: [],
-    uploadedBytes: 0, // 已上传的总字节数
+    uploadedBytes: 0,
 
     // 分片上传配置
     CHUNK_SIZE: 10 * 1024 * 1024, // 10MB 每个分片
-    MAX_RETRIES: 3, // 最大重试次数
+    MAX_RETRIES: 3,
 
     /**
      * 初始化上传模块
@@ -35,13 +35,9 @@ const Upload = {
         const copyLink = document.getElementById('copyLink');
         const uploadAnother = document.getElementById('uploadAnother');
 
-        // 点击上传区域
         uploadArea.addEventListener('click', () => fileInput.click());
-
-        // 文件选择
         fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0]));
 
-        // 拖拽上传
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -58,13 +54,9 @@ const Upload = {
             if (file) this.handleFileSelect(file);
         });
 
-        // 上传按钮
         uploadBtn.addEventListener('click', () => this.uploadFile());
-
-        // 取消文件
         cancelFile.addEventListener('click', () => this.resetUpload());
 
-        // 高级设置切换
         settingsToggle.addEventListener('click', () => {
             const content = document.getElementById('settingsContent');
             const isHidden = content.style.display === 'none';
@@ -72,19 +64,14 @@ const Upload = {
             settingsToggle.classList.toggle('active', isHidden);
         });
 
-        // 复制链接
         copyLink.addEventListener('click', () => {
             const link = document.getElementById('shareLink').value;
             Utils.copyToClipboard(link);
         });
 
-        // 继续上传
         uploadAnother.addEventListener('click', () => this.resetUpload());
     },
 
-    /**
-     * 检查 URL 参数
-     */
     checkUrlParams() {
         const fileId = Utils.getUrlParam('id');
         if (fileId) {
@@ -93,9 +80,6 @@ const Upload = {
         }
     },
 
-    /**
-     * 处理文件选择
-     */
     handleFileSelect(file) {
         if (!file) return;
 
@@ -113,9 +97,6 @@ const Upload = {
         document.getElementById('uploadArea').style.display = 'none';
     },
 
-    /**
-     * 更新进度显示
-     */
     updateProgress(loaded, total) {
         const now = Date.now();
         const percent = Math.round((loaded / total) * 100);
@@ -150,9 +131,6 @@ const Upload = {
         this.lastUploadedBytes = loaded;
     },
 
-    /**
-     * 格式化时间
-     */
     formatTime(seconds) {
         if (seconds < 60) {
             return Math.round(seconds) + ' 秒';
@@ -168,7 +146,7 @@ const Upload = {
     },
 
     /**
-     * 上传文件（自动选择单次上传或分片上传）
+     * 上传文件
      */
     async uploadFile() {
         if (!this.currentFile || this.isUploading) return;
@@ -200,12 +178,12 @@ const Upload = {
 
             const r2Key = initRes.r2_key;
 
-            // 根据文件大小选择上传方式
-            if (file.size > this.CHUNK_SIZE) {
-                // 大文件：分片上传
-                await this.uploadMultipart(file, r2Key, initRes.upload_url);
+            // 根据返回的 type 判断上传方式
+            if (initRes.type === 'multipart') {
+                // 分片上传
+                await this.uploadMultipart(file, initRes);
             } else {
-                // 小文件：单次上传
+                // 单次上传
                 await this.uploadSingle(file, r2Key, initRes.upload_url);
             }
 
@@ -247,7 +225,6 @@ const Upload = {
                 await API.setFileMaxDownloads(fileId, parseInt(maxDownloads), ownerToken);
             }
 
-            // 显示成功
             this.showSuccess(confirmRes.file, ownerToken);
 
             History.addUpload({
@@ -289,53 +266,81 @@ const Upload = {
     /**
      * 分片上传（大文件）
      */
-    async uploadMultipart(file, r2Key, firstPartUrl) {
-        const totalChunks = Math.ceil(file.size / this.CHUNK_SIZE);
+    async uploadMultipart(file, initRes) {
+        const uploadId = initRes.upload_id;
+        const r2Key = initRes.r2_key;
+        const totalParts = initRes.total_parts;
+        const initialUrls = initRes.initial_urls;
         const parts = [];
 
-        document.getElementById('progressStatus').textContent = `正在上传文件 (0/${totalChunks} 分片)...`;
+        document.getElementById('progressStatus').textContent = `正在上传文件 (0/${totalParts} 分片)...`;
 
-        // 上传第一个分片
-        const firstPartBlob = file.slice(0, this.CHUNK_SIZE);
-        const firstPartResult = await this.uploadPartWithRetry(firstPartUrl, firstPartBlob, 0);
-        parts.push({ part_number: 1, etag: firstPartResult.etag });
-        this.uploadedBytes = Math.min(this.CHUNK_SIZE, file.size);
-        this.updateProgress(this.uploadedBytes, file.size);
-
-        // 如果有多个分片，获取剩余分片的上传 URL
-        if (totalChunks > 1) {
-            const partsRes = await API.getUploadParts(r2Key, totalChunks - 1);
-            
-            if (!partsRes.success) {
-                throw new Error(partsRes.error || '获取分片URL失败');
-            }
-
-            // 上传剩余分片
-            for (let i = 1; i < totalChunks; i++) {
-                const start = i * this.CHUNK_SIZE;
-                const end = Math.min(start + this.CHUNK_SIZE, file.size);
-                const chunkBlob = file.slice(start, end);
-                const partUrl = partsRes.upload_urls[i - 1];
+        // 上传初始分片
+        const initialPartNumbers = Object.keys(initialUrls).map(n => parseInt(n)).sort((a, b) => a - b);
+        
+        for (const partNum of initialPartNumbers) {
+            const start = (partNum - 1) * initRes.part_size;
+            const end = Math.min(start + initRes.part_size, file.size);
+            const partBlob = file.slice(start, end);
+            const partUrl = initialUrls[partNum];
 
             document.getElementById('progressStatus').textContent = 
-                `正在上传文件 (${i + 1}/${totalChunks} 分片)...`;
+                `正在上传文件 (${partNum}/${totalParts} 分片)...`;
             
-            // 显示分片进度
             const chunkProgress = document.getElementById('progressChunk');
             chunkProgress.style.display = 'block';
-            chunkProgress.textContent = `当前分片: ${Utils.formatSize(chunkBlob.size)}`;
+            chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
 
-                const partResult = await this.uploadPartWithRetry(partUrl, chunkBlob, i);
-                parts.push({ part_number: i + 1, etag: partResult.etag });
+            const partResult = await this.uploadPartWithRetry(partUrl, partBlob, partNum);
+            parts.push({ partNumber: partNum, etag: partResult.etag });
 
-                this.uploadedBytes = end;
-                this.updateProgress(this.uploadedBytes, file.size);
+            this.uploadedBytes = end;
+            this.updateProgress(this.uploadedBytes, file.size);
+        }
+
+        // 如果需要更多分片 URL
+        if (initialPartNumbers.length < totalParts) {
+            const remainingPartNumbers = [];
+            for (let i = 1; i <= totalParts; i++) {
+                if (!initialUrls[i]) {
+                    remainingPartNumbers.push(i);
+                }
+            }
+
+            if (remainingPartNumbers.length > 0) {
+                const partsRes = await API.getUploadParts(uploadId, remainingPartNumbers);
+                
+                if (!partsRes.success) {
+                    throw new Error(partsRes.error || '获取分片URL失败');
+                }
+
+                // 上传剩余分片
+                for (const partUrlObj of partsRes.part_urls) {
+                    const partNum = partUrlObj.partNumber;
+                    const start = (partNum - 1) * initRes.part_size;
+                    const end = Math.min(start + initRes.part_size, file.size);
+                    const partBlob = file.slice(start, end);
+
+                    document.getElementById('progressStatus').textContent = 
+                        `正在上传文件 (${partNum}/${totalParts} 分片)...`;
+                    
+                    const chunkProgress = document.getElementById('progressChunk');
+                    chunkProgress.textContent = `当前分片: ${Utils.formatSize(partBlob.size)}`;
+
+                    const partResult = await this.uploadPartWithRetry(partUrlObj.url, partBlob, partNum);
+                    parts.push({ partNumber: partNum, etag: partResult.etag });
+
+                    this.uploadedBytes = end;
+                    this.updateProgress(this.uploadedBytes, file.size);
+                }
             }
         }
 
         // 完成分片上传
         document.getElementById('progressStatus').textContent = '正在合并分片...';
-        const completeRes = await API.completeMultipartUpload(r2Key, parts);
+        document.getElementById('progressChunk').style.display = 'none';
+        
+        const completeRes = await API.completeMultipartUpload(uploadId, parts);
 
         if (!completeRes.success) {
             throw new Error(completeRes.error || '合并分片失败');
@@ -348,32 +353,25 @@ const Upload = {
     async uploadPartWithRetry(url, blob, partIndex, retryCount = 0) {
         try {
             return await API.uploadPartToR2(url, blob, (loaded, total) => {
-                // 更新当前分片的进度
                 const currentPartProgress = loaded;
                 const totalUploaded = this.uploadedBytes - blob.size + currentPartProgress;
                 this.updateProgress(totalUploaded, this.currentFile.size);
             });
         } catch (error) {
             if (retryCount < this.MAX_RETRIES) {
-                console.warn(`分片 ${partIndex + 1} 上传失败，重试 ${retryCount + 1}/${this.MAX_RETRIES}`);
-                await this.sleep(2000); // 等待2秒后重试
+                console.warn(`分片 ${partIndex} 上传失败，重试 ${retryCount + 1}/${this.MAX_RETRIES}`);
+                await this.sleep(2000);
                 return this.uploadPartWithRetry(url, blob, partIndex, retryCount + 1);
             } else {
-                throw new Error(`分片 ${partIndex + 1} 上传失败: ${error.message}`);
+                throw new Error(`分片 ${partIndex} 上传失败: ${error.message}`);
             }
         }
     },
 
-    /**
-     * 休眠函数
-     */
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     },
 
-    /**
-     * 显示上传成功
-     */
     showSuccess(file, ownerToken) {
         document.getElementById('uploadProgress').style.display = 'none';
         document.getElementById('fileInfo').style.display = 'none';
@@ -385,9 +383,6 @@ const Upload = {
         Utils.generateQRCode(file.url, document.getElementById('shareQrcode'));
     },
 
-    /**
-     * 重置上传
-     */
     resetUpload() {
         this.currentFile = null;
         this.isUploading = false;
@@ -408,6 +403,7 @@ const Upload = {
         document.getElementById('progressUploaded').textContent = '0 B / 0 B';
         document.getElementById('progressSpeed').textContent = '计算中...';
         document.getElementById('progressTime').textContent = '计算中...';
+        document.getElementById('progressChunk').style.display = 'none';
 
         document.getElementById('password').value = '';
         document.getElementById('expiryDays').value = '3';
