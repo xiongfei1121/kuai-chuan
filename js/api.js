@@ -69,19 +69,32 @@ const API = {
             };
 
             xhr.onload = () => {
+                console.log(`分片上传完成，状态码: ${xhr.status}`);
                 if (xhr.status >= 200 && xhr.status < 300) {
                     const etag = xhr.getResponseHeader('ETag');
+                    console.log(`ETag: ${etag}`);
                     resolve({ success: true, etag: etag ? etag.replace(/"/g, '') : null });
                 } else {
-                    reject(new Error(`分片上传失败: ${xhr.status}`));
+                    const error = `分片上传失败: ${xhr.status} ${xhr.statusText}`;
+                    console.error(error);
+                    reject(new Error(error));
                 }
             };
 
-            xhr.onerror = () => reject(new Error('网络错误'));
-            xhr.ontimeout = () => reject(new Error('分片上传超时'));
+            xhr.onerror = (e) => {
+                console.error('分片上传网络错误:', e);
+                reject(new Error('网络错误，请检查网络连接'));
+            };
+            
+            xhr.ontimeout = () => {
+                console.error('分片上传超时');
+                reject(new Error('分片上传超时，请重试'));
+            };
 
             xhr.open('PUT', url, true);
             xhr.timeout = 10 * 60 * 1000; // 10分钟超时（单个分片）
+            
+            console.log(`开始上传分片，大小: ${(partBlob.size / 1024 / 1024).toFixed(2)} MB`);
             xhr.send(partBlob);
         });
     },
