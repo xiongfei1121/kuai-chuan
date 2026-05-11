@@ -123,12 +123,12 @@ const API = {
     /**
      * 获取分片上传 URL
      */
-    async getUploadParts(r2Key, partCount) {
+    async getUploadParts(uploadId, partNumbers) {
         return this.request(`${this.baseUrl}/upload/parts`, {
             method: 'POST',
             body: JSON.stringify({
-                r2_key: r2Key,
-                part_count: partCount
+                upload_id: uploadId,
+                part_numbers: partNumbers
             })
         });
     },
@@ -136,11 +136,11 @@ const API = {
     /**
      * 完成分片上传
      */
-    async completeMultipartUpload(r2Key, parts) {
+    async completeMultipartUpload(uploadId, parts) {
         return this.request(`${this.baseUrl}/upload/complete-multipart`, {
             method: 'POST',
             body: JSON.stringify({
-                r2_key: r2Key,
+                upload_id: uploadId,
                 parts: parts
             })
         });
@@ -149,11 +149,11 @@ const API = {
     /**
      * 中止上传
      */
-    async abortUpload(r2Key) {
+    async abortUpload(uploadId) {
         return this.request(`${this.baseUrl}/upload/abort`, {
             method: 'POST',
             body: JSON.stringify({
-                r2_key: r2Key
+                upload_id: uploadId
             })
         });
     },
