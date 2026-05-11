@@ -351,15 +351,23 @@ const Upload = {
      * 带重试的分片上传
      */
     async uploadPartWithRetry(url, blob, partIndex, retryCount = 0) {
+        console.log(`上传分片 ${partIndex}，重试次数: ${retryCount}`);
+        
         try {
-            return await API.uploadPartToR2(url, blob, (loaded, total) => {
+            const result = await API.uploadPartToR2(url, blob, (loaded, total) => {
                 const currentPartProgress = loaded;
                 const totalUploaded = this.uploadedBytes - blob.size + currentPartProgress;
                 this.updateProgress(totalUploaded, this.currentFile.size);
             });
+            
+            console.log(`分片 ${partIndex} 上传成功，ETag: ${result.etag}`);
+            return result;
         } catch (error) {
+            console.error(`分片 ${partIndex} 上传失败:`, error);
+            
             if (retryCount < this.MAX_RETRIES) {
                 console.warn(`分片 ${partIndex} 上传失败，重试 ${retryCount + 1}/${this.MAX_RETRIES}`);
+                Utils.showToast(`分片 ${partIndex} 上传失败，正在重试...`, 'error');
                 await this.sleep(2000);
                 return this.uploadPartWithRetry(url, blob, partIndex, retryCount + 1);
             } else {
